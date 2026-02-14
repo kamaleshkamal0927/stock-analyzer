@@ -10,7 +10,7 @@ st.set_page_config(page_title="Stock Analyzer ML", layout="wide")
 
 st.title("📈 NIFTY 50 Stock Analyzer")
 
-df = pd.read_csv("nifty50_historical_data.csv")
+df = pd.read_csv("df = pd.read_csv("nifty50_small.csv")")
 df["Date"] = pd.to_datetime(df["Date"])
 
 st.sidebar.header("Select Stock")
@@ -42,3 +42,4 @@ st.metric("MAE", round(mae,2))
 next_price = model.predict(X.iloc[-1:].values)[0]
 
 st.success(f"Next Close Prediction ₹{round(next_price,2)}")
+
