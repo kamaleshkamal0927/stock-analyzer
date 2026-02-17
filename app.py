@@ -1,78 +1,119 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import smtplib
+from email.message import EmailMessage
 
-st.set_page_config(page_title="Stock Analyzer", layout="wide")
+st.set_page_config(layout="wide")
 
-st.title("📈 Stock Analyzer – Buy / Sell / Hold")
+st.title("📈 Smart Stock Analyzer")
 
-uploaded_file = st.file_uploader("Upload your Stock CSV (Kaggle)", type="csv")
+uploaded = st.file_uploader("Upload Kaggle Stock CSV", type="csv")
 
-if uploaded_file is not None:
+if uploaded:
 
-    df = pd.read_csv(uploaded_file)
+    df = pd.read_csv(uploaded)
 
-    df['Date'] = pd.to_datetime(df['Date'])
-    df = df.sort_values('Date')
+    st.success("Dataset Loaded")
 
-    st.success("Dataset Loaded!")
+    # ---- change column name if needed ----
+    stock_column = "Symbol"   # adjust if your CSV differs
 
-    st.subheader("Dataset Preview")
-    st.dataframe(df.tail())
+    stocks = df[stock_column].unique()
 
-    # ===== Moving Averages =====
-    df['MA20'] = df['Close'].rolling(20).mean()
-    df['MA50'] = df['Close'].rolling(50).mean()
+    selected_stock = st.selectbox("🔍 Search / Select Stock", stocks)
 
-    # ===== RSI =====
-    delta = df['Close'].diff()
+    stock_df = df[df[stock_column] == selected_stock]
+
+    stock_df['Date'] = pd.to_datetime(stock_df['Date'])
+    stock_df = stock_df.sort_values("Date")
+
+    # Moving Average
+    stock_df['MA20'] = stock_df['Close'].rolling(20).mean()
+
+    # RSI
+    delta = stock_df['Close'].diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(14).mean()
-    avg_loss = loss.rolling(14).mean()
-    rs = avg_gain / avg_loss
-    df['RSI'] = 100 - (100 / (1 + rs))
+    rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+    stock_df['RSI'] = 100 - (100/(1+rs))
 
-    # ===== Signal Logic =====
-    latest_close = df['Close'].iloc[-1]
-    ma20 = df['MA20'].iloc[-1]
-    rsi = df['RSI'].iloc[-1]
+    latest = stock_df.iloc[-1]
 
-    if latest_close > ma20 and rsi < 70:
-        signal = "🟢 BUY"
+    close = latest['Close']
+    ma20 = latest['MA20']
+    rsi = latest['RSI']
+
+    # Recommendation
+    if close > ma20 and rsi < 70:
+        signal = "BUY"
     elif rsi > 70:
-        signal = "🔴 SELL"
+        signal = "SELL"
     else:
-        signal = "🟡 HOLD"
+        signal = "HOLD"
 
-    st.subheader("📊 Recommendation")
-    st.markdown(f"## {signal}")
+    st.subheader(f"📊 Recommendation: {signal}")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Latest Close", round(latest_close,2))
+    col1,col2,col3 = st.columns(3)
+    col1.metric("Close", round(close,2))
     col2.metric("MA20", round(ma20,2))
     col3.metric("RSI", round(rsi,2))
 
-    # ===== Price Chart =====
-    st.subheader("Price + Moving Average")
-
-    fig1 = plt.figure()
-    plt.plot(df['Date'], df['Close'], label="Close Price")
-    plt.plot(df['Date'], df['MA20'], label="MA20")
-    plt.plot(df['Date'], df['MA50'], label="MA50")
+    # Charts
+    fig = plt.figure()
+    plt.plot(stock_df['Date'], stock_df['Close'], label="Close")
+    plt.plot(stock_df['Date'], stock_df['MA20'], label="MA20")
     plt.legend()
-    st.pyplot(fig1)
-
-    # ===== RSI Chart =====
-    st.subheader("RSI Indicator")
+    st.pyplot(fig)
 
     fig2 = plt.figure()
-    plt.plot(df['Date'], df['RSI'])
+    plt.plot(stock_df['Date'], stock_df['RSI'])
     plt.axhline(70)
     plt.axhline(30)
     st.pyplot(fig2)
 
-    st.info("RSI > 70 = Overbought | RSI < 30 = Oversold")
+    # ================= EMAIL FEATURE =================
+
+    st.subheader("📧 Get Full Report on Email")
+
+    user_email = st.text_input("Enter your email")
+
+    if st.button("Send Report"):
+
+        body = f"""
+Stock: {selected_stock}
+
+Close Price: {close}
+MA20: {ma20}
+RSI: {rsi}
+
+Recommendation: {signal}
+
+RSI > 70 = Overbought
+RSI < 30 = Oversold
+
+Generated from Stock Analyzer App
+"""
+
+        EMAIL = "yourgmail@gmail.com"
+        PASSWORD = "your-app-password"
+
+        msg = EmailMessage()
+        msg['Subject'] = f"Stock Report – {selected_stock}"
+        msg['From'] = EMAIL
+        msg['To'] = user_email
+        msg.set_content(body)
+
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com",465) as smtp:
+                smtp.login(EMAIL,PASSWORD)
+                smtp.send_message(msg)
+
+            st.success("Email sent successfully!")
+
+        except:
+            st.error("Email failed – check credentials")
 
 else:
-    st.warning("Upload CSV to start analysis")
+    st.info("Upload CSV to begin")
+
