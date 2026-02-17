@@ -67,4 +67,12 @@ if uploaded_file is not None:
     st.subheader("RSI Indicator")
 
     fig2 = plt.figure()
-    plt.plot(
+    plt.plot(df['Date'], df['RSI'])
+    plt.axhline(70)
+    plt.axhline(30)
+    st.pyplot(fig2)
+
+    st.info("RSI > 70 = Overbought | RSI < 30 = Oversold")
+
+else:
+    st.warning("Upload CSV to start analysis")
